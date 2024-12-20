@@ -144,23 +144,7 @@ Use `System.debug` statements to trace the flow of URL construction, API request
 
 ---
 
-## Example
 
-Below is a snippet to invoke document generation via the API:
-
-```apex
-Award__c award = [SELECT Id, Name FROM Award__c LIMIT 1];
-String congaURL = '<CongaComposerURL>';
-String templateId = '<TemplateID>';
-
-Boolean isGenerated = generateAwardTemplateDocument(award, congaURL, templateId);
-
-if (isGenerated) {
-    System.debug('Document generated successfully.');
-} else {
-    System.debug('Failed to generate document.');
-}
-```
 
 ---
 
