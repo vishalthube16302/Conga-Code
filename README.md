@@ -27,9 +27,36 @@ This method dynamically constructs the Conga Composer URL based on the Salesforc
 - Handle specific actions (e.g., View NOGA, View Amendment NOGA) for file naming.
 
 ```apex
-global String generateComposer(sObject record, String SolutionName, String SolutionTemplateKeyId , String TemplateName) {
-    // Constructs the Conga Composer URL for document generation.
-}
+global String generateComposer(sObject record, String SolutionName, String SolutionTemplateKeyId , String TemplateName){
+ 
+    String PARTNER_URL = URL.getSalesforceBaseUrl().toExternalForm() + '/services/Soap/u/37.0/' + UserInfo.getOrganizationId();
+    
+
+    APXTConga4__Conga_Solution__c congaSolutionRecord = [SELECT Id, name, APXTConga4__Button_body_field__c FROM APXTConga4__Conga_Solution__c 
+    WHERE Name LIKE :SolutionName LIMIT 1]; 
+    system.debug('congaSolutionRecord =====>'+congaSolutionRecord );
+    String congaComposerURL;                      
+    congaComposerURL = congaSolutionRecord.APXTConga4__Button_body_field__c;
+    congaComposerURL = congaComposerURL.replace('{!Award__c.Id}', record.Id);
+    congaComposerURL = congaComposerURL.replace('{!API.Partner_Server_URL_370}',PARTNER_URL);
+    
+    String templateParameter ; 
+    if (!String.isBlank(TemplateName)) {
+        templateParameter = [SELECT Id, APXTConga4__Name__c, APXTConga4__Key__c 
+                    FROM APXTConga4__Conga_Template__c WHERE APXTConga4__Name__c LIKE :TemplateName LIMIT 1].APXTConga4__Key__c ;
+    
+    }
+
+    
+    congaComposerURL = congaComposerURL.replace(SolutionTemplateKeyId , templateParameter );
+     if(actionName == 'View NOGA') congaComposerURL += ('&OFN=Award+Noga' + record.get('Name'));
+     if(actionName =='View Amendment NOGA') congaComposerURL += ('&OFN=Amendment+Noga' + record.get('Name'));
+    system.debug('congaComposerURL =====>'+congaComposerURL );  
+     
+    return congaComposerURL;
+   
+ }
+
 ```
 
 ### 2. Using API
@@ -42,9 +69,48 @@ This method uses the Conga Composer API to generate and fetch documents programm
 - Make an HTTP request to generate the document and fetch the response.
 
 ```apex
+
 private Boolean generateAwardTemplateDocument(Award__c record, String congaComposerURL, String templateId) {
-    // Sends an HTTP GET request to Conga Composer for document generation.
-}
+		
+		private static final String PARTNER_URL = URL.getOrgDomainUrl().toExternalForm() + '/services/Soap/u/58.0/' + UserInfo.getOrganizationId();
+		private static final String BASE_CONGA_API_URL = 'https://composer.congamerge.com/composer8/index.html?SessionId=' + UserInfo.getSessionId();
+	
+        if (String.isEmpty(templateId)) {
+            System.debug('No matching template found.');
+            return false;
+        }
+        
+        congaComposerURL = congaComposerURL.replace('{!Award__c.Id}', record.Id);
+        congaComposerURL = congaComposerURL.replace('{!API.Partner_Server_URL_520}', PARTNER_URL);
+        System.debug('congaComposerURL::::'+congaComposerURL);
+        List<String> splitString = congaComposerURL.split('&QueryId', 2);
+        System.debug('splitString::: '+splitString);
+        
+        DateTime now = DateTime.now();
+        String formattedDate = now.format('MMddyyyyHHmmss');
+        String fileName = 'Grant_Agreement_' + formattedDate;
+
+        String endpoint = BASE_CONGA_API_URL + '&Id=' + record.Id + '&ServerUrl=' + PARTNER_URL + '&QueryId' + splitString[1].deleteWhitespace() + '&OFN=' + fileName + '&templateid=' + templateId;
+
+        System.debug('Constructed Endpoint: ' + endpoint);
+
+        HttpRequest request = new HttpRequest();
+        request.setMethod('GET');
+        request.setTimeout(120000);
+        request.setEndpoint(endpoint);
+        Http http = new Http();
+        HttpResponse response = http.send(request);
+        if (response.getStatusCode() == 200) {
+            System.debug('Document generated successfully.');
+            System.debug('Response: ' + response.getBody());
+            return true;
+        } 
+        else {
+            System.debug('Document generation failed. Status code: ' + response.getStatusCode());
+            System.debug('Response body: ' + response.getBody());
+            return false;
+        }
+    }
 ```
 
 ---
